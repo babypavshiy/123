@@ -1,71 +1,270 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import type { NextPage } from "next";
-import { useAccount } from "wagmi";
-import { BugAntIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
-import { Address } from "~~/components/scaffold-eth";
+import { useState, useEffect } from 'react';
+import { useAccount, useContractWrite, useContractRead } from 'wagmi';
+import { ethers } from 'ethers';
 
-const Home: NextPage = () => {
-  const { address: connectedAddress } = useAccount();
+const contractAddress = '0x5FbDB2315678afecb367f032d93F642f64180aa3';
+const contractABI = [
+  {
+    "inputs": [],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "sender",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "PaymentReceived",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "recipient",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "Withdrawal",
+    "type": "event"
+  },
+  {
+    "inputs": [],
+    "name": "getBalance",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getOwner",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "greeting",
+    "outputs": [
+      {
+        "internalType": "string",
+        "name": "",
+        "type": "string"
+      }
+    ],
+    "stateMutability": "pure",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "owner",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "pay",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address payable",
+        "name": "recipient",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "withdraw",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+];
+
+
+
+export default function HomePage() {
+  const { isConnected } = useAccount();
+  const [amount, setAmount] = useState('');
+  const [contract, setContract] = useState(null);
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [withdrawAddress, setWithdrawAddress] = useState('');
+
+  const { write: pay, error } = useContractWrite({
+    address: contractAddress,
+    abi: contractABI,
+    functionName: 'pay',
+    overrides: {
+      value: amount ? ethers.parseEther(amount) : ethers.parseEther('0'),
+    },
+  });
+  console.log("useContractWrite result:", pay);
+  if (error) {
+    console.error('Ошибка в useContractWrite:', error);
+  }
+  
+  
+
+  const { data: balance } = useContractRead({
+    address: contractAddress,
+    abi: contractABI,
+    functionName: 'getBalance',
+  });
+
+  const { data: owner } = useContractRead({
+    address: contractAddress,
+    abi: contractABI,
+    functionName: 'getOwner',
+  });
+  console.log("Contract owner:", owner);
+
+  useEffect(() => {
+    const initContract = async () => {
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const contractInstance = new ethers.Contract(contractAddress, contractABI, signer);
+      setContract(contractInstance);
+    };
+
+    initContract().catch(console.error);
+  }, []);
+
+  const handlePayment = async () => {
+    if (!contract) {
+      alert('Контракт не инициализирован.');
+      return;
+    }
+
+    try {
+      const tx = await contract.pay({ value: ethers.parseEther(amount) });
+      await tx.wait(); // Ожидаем завершения транзакции
+      alert('Платеж успешно выполнен!');
+    } catch (err) {
+      console.error('Ошибка при выполнении платежа:', err);
+      alert('Произошла ошибка при выполнении платежа.');
+    }
+  };
+
+  const handleWithdraw = async () => {
+    if (!contract) {
+      alert('Контракт не инициализирован.');
+      return;
+    }
+
+    if (!withdrawAddress || !withdrawAmount || parseFloat(withdrawAmount) <= 0) {
+      alert('Введите корректный адрес и сумму для вывода.');
+      return;
+    }
+
+    try {
+      const tx = await contract.withdraw(
+        withdrawAddress,
+        ethers.parseEther(withdrawAmount)
+      );
+      await tx.wait(); // Ожидаем завершения транзакции
+      alert('Деньги успешно выведены!');
+    } catch (err) {
+      console.error('Ошибка при выводе средств:', err);
+      alert('Произошла ошибка при выводе средств.');
+    }
+  };
 
   return (
-    <>
-      <div className="flex items-center flex-col flex-grow pt-10">
-        <div className="px-5">
-          <h1 className="text-center">
-            <span className="block text-2xl mb-2">Welcome to</span>
-            <span className="block text-4xl font-bold">Scaffold-ETH 2</span>
-          </h1>
-          <div className="flex justify-center items-center space-x-2 flex-col sm:flex-row">
-            <p className="my-2 font-medium">Connected Address:</p>
-            <Address address={connectedAddress} />
+    <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
+      <h1>YourContract</h1>
+      {isConnected ? (
+        <>
+          <div>
+            <h2>Ввод средств</h2>
+            <label>Введите сумму (ETH): </label>
+            <input
+              type="number"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="0.01"
+              style={{ marginRight: '10px' }}
+            />
+            <button onClick={handlePayment} style={{ padding: '5px 10px' }}>
+              Отправить платеж
+            </button>
           </div>
-          <p className="text-center text-lg">
-            Get started by editing{" "}
-            <code className="italic bg-base-300 text-base font-bold max-w-full break-words break-all inline-block">
-              packages/nextjs/app/page.tsx
-            </code>
-          </p>
-          <p className="text-center text-lg">
-            Edit your smart contract{" "}
-            <code className="italic bg-base-300 text-base font-bold max-w-full break-words break-all inline-block">
-              YourContract.sol
-            </code>{" "}
-            in{" "}
-            <code className="italic bg-base-300 text-base font-bold max-w-full break-words break-all inline-block">
-              packages/hardhat/contracts
-            </code>
-          </p>
-        </div>
-
-        <div className="flex-grow bg-base-300 w-full mt-16 px-8 py-12">
-          <div className="flex justify-center items-center gap-12 flex-col sm:flex-row">
-            <div className="flex flex-col bg-base-100 px-10 py-10 text-center items-center max-w-xs rounded-3xl">
-              <BugAntIcon className="h-8 w-8 fill-secondary" />
-              <p>
-                Tinker with your smart contract using the{" "}
-                <Link href="/debug" passHref className="link">
-                  Debug Contracts
-                </Link>{" "}
-                tab.
-              </p>
-            </div>
-            <div className="flex flex-col bg-base-100 px-10 py-10 text-center items-center max-w-xs rounded-3xl">
-              <MagnifyingGlassIcon className="h-8 w-8 fill-secondary" />
-              <p>
-                Explore your local transactions with the{" "}
-                <Link href="/blockexplorer" passHref className="link">
-                  Block Explorer
-                </Link>{" "}
-                tab.
-              </p>
-            </div>
+          <div style={{ marginTop: '20px' }}>
+            <h2>Вывод средств</h2>
+            <label>Адрес получателя: </label>
+            <input
+              type="text"
+              value={withdrawAddress}
+              onChange={(e) => setWithdrawAddress(e.target.value)}
+              placeholder="0x..."
+              style={{ marginRight: '10px', width: '300px' }}
+            />
+            <br />
+            <label>Сумма (ETH): </label>
+            <input
+              type="number"
+              value={withdrawAmount}
+              onChange={(e) => setWithdrawAmount(e.target.value)}
+              placeholder="0.01"
+              style={{ marginRight: '10px' }}
+            />
+            <button onClick={handleWithdraw} style={{ padding: '5px 10px' }}>
+              Вывести средства
+            </button>
           </div>
-        </div>
-      </div>
-    </>
+          <div style={{ marginTop: '20px' }}>
+            <h2>Баланс контракта: {balance ? ethers.formatEther(balance) : '0'} ETH</h2>
+          </div>
+        </>
+      ) : (
+        <p>Пожалуйста, подключите ваш кошелек.</p>
+      )}
+    </div>
   );
-};
-
-export default Home;
+}

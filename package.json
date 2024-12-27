@@ -48,10 +48,20 @@
   },
   "packageManager": "yarn@3.2.3",
   "devDependencies": {
+    "@nomiclabs/hardhat-ethers": "^2.2.3",
+    "chai": "^5.1.2",
+    "ethers": "latest",
+    "hardhat": "^2.22.17",
     "husky": "^9.1.6",
     "lint-staged": "^15.2.10"
   },
   "engines": {
     "node": ">=18.18.0"
+  },
+  "dependencies": {
+    "@ethersproject/address": "^5.7.0",
+    "@rainbow-me/rainbowkit": "^2.2.1",
+    "viem": "^2.21.57",
+    "wagmi": "^2.14.6"
   }
 }
